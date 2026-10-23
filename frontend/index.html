@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnergyIQ — Smart Energy Consumption Optimizer</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            },
+            energy: {
+              blue: '#2563eb',
+              indigo: '#6366f1',
+              emerald: '#059669',
+              amber: '#d97706',
+              rose: '#e11d48',
+              slate: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Default Pre-computed Data for Instant Standalone Execution -->
+  <script src="default_data.js"></script>
+
+  <style>
+    /* Clean Light Theme Custom Enhancements */
+    body {
+      background-color: #f8fafc;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .card-light {
+      background-color: #ffffff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+      border-radius: 1rem;
+    }
+    .card-light-hover {
+      transition: all 0.2s ease-in-out;
+    }
+    .card-light-hover:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+      border-color: #cbd5e1;
+    }
+    /* Custom Scrollbar for tables */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-sm shadow-emerald-200">
+          <i data-lucide="zap" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Energy<span class="text-emerald-600">IQ</span></h1>
+            <span class="text-xs px-2 py-0.5 font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">Prototype v1.0</span>
+          </div>
+          <p class="text-xs text-slate-500 hidden sm:block">Smart Energy Consumption Optimizer • PS-1</p>
+        </div>
+      </div>
+
+      <!-- Center Status / Dataset Info -->
+      <div class="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>Active Dataset: <strong id="datasetNameBadge" class="text-slate-900">Tetuan City Power Grid (3 Zones)</strong></span>
+        <span class="text-slate-400">|</span>
+        <span id="recordCountBadge" class="text-slate-600">12,960 Readings</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <input type="file" id="quickCsvInput" accept=".csv" class="hidden" />
+        <button id="btnQuickCsv" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg shadow-xs transition" title="Directly read any CSV from your computer">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+          <span>Read CSV File</span>
+        </button>
+        <button id="btnOpenUpload" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-xs transition">
+          <i data-lucide="upload" class="w-4 h-4 text-slate-500"></i>
+          <span>Upload / Drop CSV</span>
+        </button>
+        <button id="btnResetDefault" class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Reset to Tetuan</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- CONTROLS & FILTER BAR -->
+    <div class="card-light p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <!-- Zone / Feeder Selector -->
+      <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mr-1">
+          <i data-lucide="layers" class="w-3.5 h-3.5"></i> Feeders:
+        </span>
+        <button data-zone="Total_Power_KW" class="zone-pill px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-sm shadow-emerald-200 transition">
+          Total City Grid
+        </button>
+        <button data-zone="Zone 1 Power Consumption" class="zone-pill px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          Zone 1 (Quads)
+        </button>
+        <button data-zone="Zone 2 Power Consumption" class="zone-pill px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          Zone 2 (Smir)
+        </button>
+        <button data-zone="Zone 3 Power Consumption" class="zone-pill px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+          Zone 3 (Boussafou)
+        </button>
+      </div>
+
+      <!-- Fine-Tuning Controls -->
+      <div class="flex flex-wrap items-center gap-4 w-full md:w-auto justify-end">
+        <div class="flex items-center space-x-2 text-xs text-slate-600">
+          <span class="font-medium">Peak Threshold:</span>
+          <select id="selectQuantile" class="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+            <option value="0.90">90th Percentile</option>
+            <option value="0.93" selected>93rd Percentile (Standard)</option>
+            <option value="0.95">95th Percentile (Conservative)</option>
+            <option value="0.98">98th Percentile (Extreme)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center space-x-2 text-xs text-slate-600">
+          <span class="font-medium">Anomaly Sensitivity:</span>
+          <select id="selectSensitivity" class="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+            <option value="2.5">High (More Alerts)</option>
+            <option value="3.0" selected>Balanced (Standard)</option>
+            <option value="4.0">Strict (Critical Only)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXECUTIVE KPI CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- KPI 1: Total Energy -->
+      <div class="card-light card-light-hover p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Energy Consumption</span>
+          <div class="p-2 bg-blue-50 text-blue-600 rounded-xl">
+            <i data-lucide="gauge" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="flex items-baseline space-x-2">
+            <span id="kpiTotalEnergy" class="text-3xl font-extrabold text-slate-900">--</span>
+            <span class="text-sm font-semibold text-slate-500">MWh</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-500 flex items-center justify-between">
+            <span>Avg Power: <strong id="kpiAvgPower" class="text-slate-700">-- kW</strong></span>
+            <span>Baseload: <strong id="kpiBaseload" class="text-slate-700">-- kW</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 2: Peak Demand -->
+      <div class="card-light card-light-hover p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Peak Demand Recorded</span>
+          <div class="p-2 bg-amber-50 text-amber-600 rounded-xl">
+            <i data-lucide="trending-up" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="flex items-baseline space-x-2">
+            <span id="kpiMaxPeak" class="text-3xl font-extrabold text-amber-600">--</span>
+            <span class="text-sm font-semibold text-slate-500">kW</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-500 flex items-center justify-between">
+            <span>Peak Threshold: <strong id="kpiPeakThreshold" class="text-slate-700">-- kW</strong></span>
+            <span>Episodes: <strong id="kpiPeakCount" class="text-amber-700">--</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 3: Energy Health & Efficiency Score -->
+      <div class="card-light card-light-hover p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Energy Efficiency Score</span>
+          <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="flex items-baseline space-x-2">
+            <span id="kpiEESScore" class="text-3xl font-extrabold text-emerald-600">--</span>
+            <span class="text-sm font-semibold text-slate-500">/ 100</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-500 flex items-center justify-between">
+            <span>Day / Night Ratio: <strong id="kpiDayNightRatio" class="text-slate-700">--</strong></span>
+            <span class="text-emerald-700 font-semibold">Standard Optimal</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 4: Anomalies & Tariff Impact -->
+      <div class="card-light card-light-hover p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Flagged Anomalies</span>
+          <div class="p-2 bg-rose-50 text-rose-600 rounded-xl">
+            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="flex items-baseline space-x-2">
+            <span id="kpiAnomalyCount" class="text-3xl font-extrabold text-rose-600">--</span>
+            <span class="text-sm font-semibold text-slate-500">Events</span>
+          </div>
+          <div class="mt-2 text-xs text-slate-500 flex items-center justify-between">
+            <span>Critical: <strong id="kpiCriticalCount" class="text-rose-700 font-bold">--</strong></span>
+            <span>Est. Charges: <strong id="kpiDemandCharges" class="text-slate-700">--</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN TIME-SERIES CHART SECTION -->
+    <div class="card-light p-6">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="activity" class="w-5 h-5 text-emerald-600"></i>
+            Continuous Power Demand & Anomaly Telemetry
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5">High-resolution 10-minute time-series with peak threshold line and detected anomaly highlights</p>
+        </div>
+        <!-- Legend pills -->
+        <div class="flex items-center space-x-3 text-xs font-medium">
+          <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-blue-500 mr-1.5"></span> Demand (kW)</span>
+          <span class="inline-flex items-center"><span class="w-3 h-0.5 bg-amber-500 mr-1.5"></span> Peak Threshold</span>
+          <span class="inline-flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-rose-600 mr-1.5"></span> Flagged Anomaly</span>
+        </div>
+      </div>
+
+      <div class="w-full h-80 sm:h-96 relative">
+        <canvas id="mainChart"></canvas>
+      </div>
+    </div>
+
+    <!-- SECONDARY ANALYTICS ROW: 24-HOUR PROFILE & ZONE DISTRIBUTION & WEATHER -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 24-Hour Diurnal Load Profile -->
+      <div class="card-light p-5 lg:col-span-1">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="clock" class="w-4 h-4 text-emerald-600"></i>
+            24-Hour Diurnal Load Profile
+          </h3>
+          <span class="text-xs text-slate-400">Weekday vs Weekend</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Identifies base-load vs active operational hours and night setbacks.</p>
+        <div class="h-64 relative">
+          <canvas id="loadProfileChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Substation Share Breakdown -->
+      <div class="card-light p-5 lg:col-span-1">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-600"></i>
+            Substation Grid Distribution
+          </h3>
+          <span class="text-xs text-slate-400">Total Share</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Zone 1 (Quads), Zone 2 (Smir), Zone 3 (Boussafou).</p>
+        <div class="h-64 relative flex items-center justify-center">
+          <canvas id="zoneDonutChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Weather vs Power Correlation -->
+      <div class="card-light p-5 lg:col-span-1">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            <i data-lucide="sun" class="w-4 h-4 text-amber-500"></i>
+            Thermal Demand Sensitivity
+          </h3>
+          <span class="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold border border-blue-200">r = 0.52</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Power consumption as a function of ambient temperature (°C).</p>
+        <div class="h-64 relative">
+          <canvas id="weatherScatterChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- PEAKS & ANOMALIES DRILLDOWN TABS -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Top Peak Demand Periods -->
+      <div class="card-light p-5 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <div class="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+              <i data-lucide="alert-circle" class="w-4 h-4"></i>
+            </div>
+            <h3 class="text-sm font-bold text-slate-900">High-Demand Peak Episodes</h3>
+          </div>
+          <span id="peakTableCount" class="text-xs font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200">
+            -- Peaks
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Identified intervals breaching the threshold. Critical for avoiding peak demand charge spikes.</p>
+
+        <div class="overflow-y-auto max-h-72 border border-slate-100 rounded-lg">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 sticky top-0 font-semibold">
+              <tr>
+                <th class="py-2 px-3">Start Time</th>
+                <th class="py-2 px-3">Peak (kW)</th>
+                <th class="py-2 px-3">Duration</th>
+                <th class="py-2 px-3">Intensity</th>
+                <th class="py-2 px-3">Demand Impact</th>
+              </tr>
+            </thead>
+            <tbody id="peaksTableBody" class="divide-y divide-slate-100 text-slate-700">
+              <tr><td colspan="5" class="py-4 text-center text-slate-400">Loading peaks...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AI Anomaly Alert Feed -->
+      <div class="card-light p-5 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <div class="p-1.5 bg-rose-50 text-rose-600 rounded-lg">
+              <i data-lucide="radar" class="w-4 h-4"></i>
+            </div>
+            <h3 class="text-sm font-bold text-slate-900">AI Anomaly Alerts (Hampel / MAD)</h3>
+          </div>
+          <span id="anomalyTableCount" class="text-xs font-semibold px-2 py-0.5 bg-rose-50 text-rose-700 rounded-full border border-rose-200">
+            -- Flagged
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 mb-3">Unusual spikes, sudden drops, or unauthorized off-hour operation warranting facility inspection.</p>
+
+        <div class="overflow-y-auto max-h-72 space-y-2 pr-1" id="anomalyAlertFeed">
+          <div class="py-4 text-center text-slate-400 text-xs">Loading anomalies...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- EVIDENCE-BASED RECOMMENDATIONS ENGINE -->
+    <div class="card-light p-6">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <div class="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+            </div>
+            <h2 class="text-base font-bold text-slate-900">Evidence-Based Efficiency Recommendations</h2>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Rule-based optimization actions strictly derived from observed telemetry, calculated baselines, and utility tariffs.</p>
+        </div>
+        <!-- Priority Badges Summary -->
+        <div class="flex items-center space-x-2 text-xs">
+          <span class="px-2 py-1 rounded bg-rose-50 text-rose-700 font-semibold border border-rose-200">High Priority Action</span>
+          <span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200">Quantified ROI</span>
+        </div>
+      </div>
+
+      <!-- Recommendation Cards Grid -->
+      <div id="recommendationsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="p-4 text-center text-slate-400 text-xs">Loading recommendations...</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- UPLOAD MODAL -->
+  <div id="uploadModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="card-light max-w-lg w-full p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center space-x-2">
+          <div class="p-2 bg-emerald-50 text-emerald-700 rounded-xl">
+            <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-900">Upload Energy Dataset (CSV)</h3>
+        </div>
+        <button id="btnCloseUpload" class="text-slate-400 hover:text-slate-600 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-600 mb-4">
+        Upload any CSV with timestamps and numeric consumption columns. Supports Tetuan City, UCI Appliances, Household Power, or custom building telemetry.
+      </p>
+
+      <!-- Drag & Drop Box -->
+      <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-emerald-500 hover:bg-emerald-50/30 transition cursor-pointer">
+        <input type="file" id="fileInput" accept=".csv" class="hidden" />
+        <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-400 mx-auto mb-2"></i>
+        <p class="text-xs font-semibold text-slate-700">Click to browse or drag & drop CSV file</p>
+        <p class="text-2xs text-slate-400 mt-1">UTF-8 CSV format, up to 50MB</p>
+      </div>
+
+      <div id="uploadStatus" class="mt-4 text-xs font-medium text-slate-600 hidden"></div>
+
+      <div class="mt-6 flex justify-end space-x-3">
+        <button id="btnCancelUpload" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancel</button>
+        <button id="btnSubmitUpload" class="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition disabled:opacity-50" disabled>
+          Analyze Dataset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t border-slate-200 mt-12 py-4">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+      <div class="flex items-center space-x-2">
+        <span>EnergyIQ © 2026</span>
+        <span>•</span>
+        <span>HACKNOVA’26 PS-1 Prototype</span>
+      </div>
+      <div class="flex items-center space-x-3 text-slate-400">
+        <span>Light Mode Active</span>
+        <span>•</span>
+        <span id="apiStatusBadge" class="inline-flex items-center text-emerald-600 font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> Ready
+        </span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Main Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
